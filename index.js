@@ -47,6 +47,7 @@ Testem.handleConsoleMessage = function (msg) {
 
 /**
  * Creates Express middleware (for Testem `middleware:`) that forwards requests to Vite in middleware mode.
+ * Strips Testem’s per-browser session prefix (`/:id/…`) so Vite resolves paths from the project root.
  * Skips `/testem.js`, `/testem/*`, and `/socket.io` so Testem’s own routes run later in the stack.
  *
  * @param {import('vite').InlineConfig} [inlineConfig] merged after defaults; set `configFile: false` to skip loading `vite.config.js`
@@ -76,7 +77,23 @@ async function createTestemViteMiddleware(inlineConfig = {}) {
 
   function middleware(app) {
     app.use((req, res, next) => {
-      const pathname = req.url.split('?')[0];
+      let url = req.url;
+      const qIdx = url.indexOf('?');
+      const pathPart = qIdx === -1 ? url : url.slice(0, qIdx);
+      const queryPart = qIdx === -1 ? '' : url.slice(qIdx);
+      // Testem opens the runner under /:id/… (browser session). Strip it so Vite resolves files
+      // from project root (same path layout as bare /tests_run.html).
+      const withPath = pathPart.match(/^\/-?\d+\/(.+)$/);
+      const idOnly = pathPart.match(/^\/-?\d+$/);
+      if (withPath) {
+        req.url = `/${withPath[1]}${queryPart}`;
+        url = req.url;
+      } else if (idOnly) {
+        req.url = `/${queryPart}`;
+        url = req.url;
+      }
+
+      const pathname = url.split('?')[0];
       if (
         pathname === '/testem.js' ||
         pathname.startsWith('/testem/') ||

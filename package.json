@@ -1,6 +1,6 @@
 {
   "name": "vite-plugin-testem",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Vite plugin and Testem middleware helper for running browser tests with Testem",
   "keywords": [
     "vite",
