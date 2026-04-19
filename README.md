@@ -10,6 +10,12 @@ npm install vite-plugin-testem --save-dev
 
 You must also install a compatible Vite version (peer dependency: `^7.0.0 || ^8.0.0`).
 
+To run browser tests with Testem, install Testem in your project (optional peer dependency: `^3.20.0`):
+
+```bash
+npm install testem@^3.20.0 --save-dev
+```
+
 ## `vitePluginTestem(options)`
 
 Vite plugin that injects the Testem client script (`/testem.js`) into `index.html`. For TAP-style runners it can inject the usual `Testem.handleConsoleMessage` bridge.

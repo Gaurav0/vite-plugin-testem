@@ -4,6 +4,7 @@
   "description": "Vite plugin and Testem middleware helper for running browser tests with Testem",
   "keywords": [
     "vite",
+    "plugin",
     "vite-plugin",
     "testem",
     "testing"
@@ -33,7 +34,13 @@
     "LICENSE"
   ],
   "peerDependencies": {
-    "vite": "^7.0.0 || ^8.0.0"
+    "vite": "^7.0.0 || ^8.0.0",
+    "testem": "^3.20.0"
+  },
+  "peerDependenciesMeta": {
+    "testem": {
+      "optional": true
+    }
   },
   "scripts": {
     "lint": "eslint .",
