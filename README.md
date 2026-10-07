@@ -8,6 +8,8 @@
 npm install vite-plugin-testem --save-dev
 ```
 
+Node.js `^20.19.0 || ^22.12.0 || ^24.0.0 || >=26.0.0` is required.
+
 You must also install a compatible Vite version (peer dependency: `^7.0.0 || ^8.0.0`).
 
 To run browser tests with Testem, install Testem in your project (optional peer dependency: `^3.20.0 || ^4.0.0-beta.1`):

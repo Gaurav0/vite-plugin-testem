@@ -7,9 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-10-07
+
 ### Changed
 
-- Optional `testem` peer range is now `^3.20.0 || ^4.0.0-beta.1`. `^4.0.0` does not match `4.0.0-beta.1`. Testem 4’s own engines are Node `^22.17.0 || ^24.0.0 || >=26.0.0`.
+- Optional `testem` peer range is now `^3.20.0 || ^4.0.0-beta.1`. `^4.0.0` does not match `4.0.0-beta.1`.
+- Node.js engines are `^20.19.0 || ^22.12.0 || ^24.0.0 || >=26.0.0`. Node 25 is not supported.
 
 ### Fixed
 
