@@ -10,10 +10,12 @@ npm install vite-plugin-testem --save-dev
 
 You must also install a compatible Vite version (peer dependency: `^7.0.0 || ^8.0.0`).
 
-To run browser tests with Testem, install Testem in your project (optional peer dependency: `^3.20.0`):
+To run browser tests with Testem, install Testem in your project (optional peer dependency: `^3.20.0 || ^4.0.0-beta.1`):
 
 ```bash
 npm install testem@^3.20.0 --save-dev
+# or, on Node ^22.17.0 || ^24.0.0 || >=26.0.0:
+npm install testem@^4.0.0-beta.1 --save-dev
 ```
 
 ## `vitePluginTestem(options)`
