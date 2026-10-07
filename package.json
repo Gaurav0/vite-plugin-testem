@@ -1,6 +1,6 @@
 {
   "name": "vite-plugin-testem",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Vite plugin and Testem middleware helper for running browser tests with Testem",
   "keywords": [
     "vite",
@@ -19,7 +19,7 @@
     "url": "https://github.com/Gaurav0/vite-plugin-testem/issues"
   },
   "engines": {
-    "node": "^20.19.0 || ^22.12.0 || >=24.0.0"
+    "node": "^20.19.0 || ^22.12.0 || ^24.0.0 || >=26.0.0"
   },
   "main": "./index.js",
   "exports": {
@@ -36,7 +36,7 @@
   ],
   "peerDependencies": {
     "vite": "^7.0.0 || ^8.0.0",
-    "testem": "^3.20.0"
+    "testem": "^3.20.0 || ^4.0.0-beta.1"
   },
   "peerDependenciesMeta": {
     "testem": {
@@ -45,7 +45,8 @@
   },
   "scripts": {
     "lint": "eslint .",
-    "test": "node scripts/smoke-test.js"
+    "test": "node scripts/smoke-test.js",
+    "test:integration": "node scripts/integration-test.js"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.0",

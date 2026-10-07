@@ -1,5 +1,6 @@
 'use strict';
 
+const fs = require('fs/promises');
 const path = require('path');
 const vite = require('vite');
 
@@ -48,6 +49,8 @@ Testem.handleConsoleMessage = function (msg) {
 /**
  * Creates Express middleware (for Testem `middleware:`) that forwards requests to Vite in middleware mode.
  * Strips Testem’s per-browser session prefix (`/:id/…`) so Vite resolves paths from the project root.
+ * Transforms `*.html` with `server.transformIndexHtml` so plugins such as `vitePluginTestem` run.
+ * `appType: 'custom'` stays in place so a missing file falls through to Testem instead of Vite’s 404.
  * Skips `/testem.js`, `/testem/*`, and `/socket.io` so Testem’s own routes run later in the stack.
  *
  * @param {import('vite').InlineConfig} [inlineConfig] merged after defaults; set `configFile: false` to skip loading `vite.config.js`
@@ -101,6 +104,29 @@ async function createTestemViteMiddleware(inlineConfig = {}) {
       ) {
         return next();
       }
+
+      if (pathname.endsWith('.html')) {
+        const rootPath = path.resolve(cwd);
+        const filePath = path.resolve(rootPath, pathname.slice(1));
+        const relative = path.relative(rootPath, filePath);
+        if (!relative.startsWith('..') && !path.isAbsolute(relative)) {
+          fs.readFile(filePath, 'utf8')
+            .then((html) => server.transformIndexHtml(url, html))
+            .then((html) => {
+              res.statusCode = 200;
+              res.setHeader('Content-Type', 'text/html; charset=utf-8');
+              res.end(html);
+            })
+            .catch((err) => {
+              if (err && err.code === 'ENOENT') {
+                return server.middlewares(req, res, next);
+              }
+              return next(err);
+            });
+          return;
+        }
+      }
+
       server.middlewares(req, res, next);
     });
   }

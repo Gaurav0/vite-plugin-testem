@@ -11,7 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: ['20.19', '22.12', '24']
+        node-version: ['20.19', '22.12', '24', '26']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -21,3 +21,35 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm test
+
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Testem 4 engines are ^22.17.0 || ^24.0.0 || >=26.0.0.
+          # Testem 4 runs only on the Node 24 and Node 26 cells.
+          - node-version: '20.19'
+            testem-version: '3.20.0'
+          - node-version: '22.12'
+            testem-version: '3'
+          - node-version: '24'
+            testem-version: '3'
+          - node-version: '26'
+            testem-version: '3'
+          - node-version: '24'
+            testem-version: '4.0.0-beta.1'
+          - node-version: '26'
+            testem-version: '4.0.0-beta.1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+      - run: npm ci
+      - run: npm run test:integration
+        env:
+          TESTEM_VERSION: ${{ matrix.testem-version }}

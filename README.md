@@ -8,12 +8,16 @@
 npm install vite-plugin-testem --save-dev
 ```
 
+Node.js `^20.19.0 || ^22.12.0 || ^24.0.0 || >=26.0.0` is required.
+
 You must also install a compatible Vite version (peer dependency: `^7.0.0 || ^8.0.0`).
 
-To run browser tests with Testem, install Testem in your project (optional peer dependency: `^3.20.0`):
+To run browser tests with Testem, install Testem in your project (optional peer dependency: `^3.20.0 || ^4.0.0-beta.1`):
 
 ```bash
 npm install testem@^3.20.0 --save-dev
+# or, on Node ^22.17.0 || ^24.0.0 || >=26.0.0:
+npm install testem@^4.0.0-beta.1 --save-dev
 ```
 
 ## `vitePluginTestem(options)`
@@ -63,6 +67,16 @@ module.exports = async function testemConfig() {
     },
   };
 };
+```
+
+## Development
+
+`npm test` runs the smoke test. It does not need Testem or a browser.
+
+`npm run test:integration` installs Testem into `fixtures/integration` and runs headless Chrome. `TESTEM_VERSION` defaults to `3.20.0`. Testem 4 needs Chrome and Node `^22.17.0 || ^24.0.0 || >=26.0.0`:
+
+```bash
+TESTEM_VERSION=4.0.0-beta.1 npm run test:integration
 ```
 
 ## License
