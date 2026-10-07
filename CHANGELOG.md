@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Optional `testem` peer range is now `^3.20.0 || ^4.0.0-beta.1`. `^4.0.0` does not match `4.0.0-beta.1`. Testem 4’s own engines are Node `^22.17.0 || ^24.0.0 || >=26.0.0`.
 
+### Fixed
+
+- **`createTestemViteMiddleware`:** Transform `*.html` with Vite so `vitePluginTestem` injection runs in middleware mode. `appType` stays `custom`, so paths Vite does not serve still fall through to Testem.
+
 ## [1.0.1] - 2026-04-19
 
 ### Fixed
