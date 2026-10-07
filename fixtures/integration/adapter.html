@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head></head>
+<body>
+<script>
+Testem.useCustomAdapter(function (socket) {
+  socket.emit('tests-start');
+  socket.emit('test-result', {
+    passed: 1,
+    failed: 0,
+    total: 1,
+    id: 1,
+    name: 'client connected',
+    items: []
+  });
+  socket.emit('all-test-results');
+});
+</script>
+</body>
+</html>

@@ -67,6 +67,16 @@ module.exports = async function testemConfig() {
 };
 ```
 
+## Development
+
+`npm test` runs the smoke test. It does not need Testem or a browser.
+
+`npm run test:integration` installs Testem into `fixtures/integration` and runs headless Chrome. `TESTEM_VERSION` defaults to `3.20.0`. Testem 4 needs Chrome and Node `^22.17.0 || ^24.0.0 || >=26.0.0`:
+
+```bash
+TESTEM_VERSION=4.0.0-beta.1 npm run test:integration
+```
+
 ## License
 
 MIT

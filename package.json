@@ -45,7 +45,8 @@
   },
   "scripts": {
     "lint": "eslint .",
-    "test": "node scripts/smoke-test.js"
+    "test": "node scripts/smoke-test.js",
+    "test:integration": "node scripts/integration-test.js"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.0",
