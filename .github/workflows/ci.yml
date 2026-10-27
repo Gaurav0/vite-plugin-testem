@@ -31,8 +31,13 @@ jobs:
         include:
           # Testem 4 engines are ^22.17.0 || ^24.0.0 || >=26.0.0.
           # Testem 4 runs only on the Node 24 and Node 26 cells.
+          # Cells without vite-version use the fixture's Vite 8.
           - node-version: '20.19'
             testem-version: '3.20.0'
+          # Vite 7 on the oldest supported Node and Testem.
+          - node-version: '20.19'
+            testem-version: '3.20.0'
+            vite-version: '7'
           - node-version: '22.12'
             testem-version: '3'
           - node-version: '24'
@@ -53,3 +58,4 @@ jobs:
       - run: npm run test:integration
         env:
           TESTEM_VERSION: ${{ matrix.testem-version }}
+          VITE_VERSION: ${{ matrix.vite-version }}
