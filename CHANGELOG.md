@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-27
+
+### Added
+
+- **`createTestemViteMiddleware`:** When Testem passes `hooks.onExit`, the Vite server closes on Testem shutdown. An `on_exit` hook is only needed for older Testem.
+- **`createTestemViteMiddleware`:** In dev, when `hooks.watching` is set, Testem's file watcher is released and Vite's `change`, `add`, and `unlink` events are forwarded to `hooks.notifyFileChange`. A single run closes Vite's watcher.
+
 ## [1.0.2] - 2026-10-07
 
 ### Changed

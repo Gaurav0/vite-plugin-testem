@@ -54,7 +54,7 @@ Testem.handleConsoleMessage = function (msg) {
  * Skips `/testem.js`, `/testem/*`, and `/socket.io` so Testem’s own routes run later in the stack.
  *
  * @param {import('vite').InlineConfig} [inlineConfig] merged after defaults; set `configFile: false` to skip loading `vite.config.js`
- * @returns {Promise<{ middleware: (app: import('express').Application) => void, close: () => Promise<void> }>}
+ * @returns {Promise<{ middleware: (app: import('express').Application, httpServer?: import('node:http').Server, hooks?: { onExit?: (fn: () => void | Promise<void>) => void }) => void, close: () => Promise<void> }>}
  */
 async function createTestemViteMiddleware(inlineConfig = {}) {
   const cwd = inlineConfig.root || inlineConfig.cwd || process.cwd();
@@ -78,7 +78,12 @@ async function createTestemViteMiddleware(inlineConfig = {}) {
 
   const server = await vite.createServer(base);
 
-  function middleware(app) {
+  function middleware(app, _httpServer, hooks) {
+    if (hooks && typeof hooks.onExit === 'function') {
+      hooks.onExit(() => server.close());
+    }
+    adoptFileWatcher(server, hooks);
+
     app.use((req, res, next) => {
       let url = req.url;
       const qIdx = url.indexOf('?');
@@ -135,6 +140,42 @@ async function createTestemViteMiddleware(inlineConfig = {}) {
     middleware,
     close: () => server.close(),
   };
+}
+
+/**
+ * CI and other single runs do not need Vite's chokidar. In dev, when Testem is
+ * watching, drop Testem's watcher and forward Vite's events so only one
+ * chokidar is open. `watching: false` (disable_watching) leaves Vite's watcher
+ * in place for module invalidation and does not rerun tests.
+ *
+ * @param {import('vite').ViteDevServer} server
+ * @param {{ singleRun?: boolean, watching?: boolean, notifyFileChange?: (file: string) => void, releaseFileWatcher?: () => void | Promise<void> } | undefined} hooks
+ */
+function adoptFileWatcher(server, hooks) {
+  if (!hooks) {
+    return;
+  }
+  if (hooks.singleRun) {
+    const closed = server.watcher && server.watcher.close();
+    if (closed && typeof closed.catch === 'function') {
+      closed.catch((err) => {
+        server.config.logger.error(err);
+      });
+    }
+    return;
+  }
+  if (!hooks.watching || typeof hooks.notifyFileChange !== 'function') {
+    return;
+  }
+  if (typeof hooks.releaseFileWatcher === 'function') {
+    Promise.resolve(hooks.releaseFileWatcher()).catch((err) => {
+      server.config.logger.error(err);
+    });
+  }
+  const notify = (file) => hooks.notifyFileChange(file);
+  server.watcher.on('change', notify);
+  server.watcher.on('add', notify);
+  server.watcher.on('unlink', notify);
 }
 
 module.exports = {

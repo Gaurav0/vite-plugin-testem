@@ -35,13 +35,15 @@ Returns a Promise of `{ middleware, close }`. Use `middleware` in Testem’s `mi
 
 Pass Vite `InlineConfig` fields as needed (for example `root: __dirname`). Set `configFile: false` if you do not want Vite to load `vite.config.js`.
 
-## Recommended: `on_exit` and `close()`
+## Shutdown
 
-Vite’s dev server registers file watchers and keeps resources open. If you only register the middleware and exit Testem, those handles can prevent the process from exiting cleanly or leave watcher noise in the background.
+`createTestemViteMiddleware()` returns `{ middleware, close }`.
 
-Call the `close()` function returned with the middleware from Testem’s **`on_exit`** hook. That shuts down the Vite server the same way as stopping the CLI dev server.
+When Testem calls `middleware(app, httpServer, hooks)` and `hooks.onExit` is a function, the helper registers `close()` there. Testem runs that when it stops the server, so you do not add an `on_exit` hook. `close()` is safe to call again if an older config still invokes it from `on_exit`.
 
-Example `testem.js`:
+In dev, when `hooks.watching` is true, the helper closes Testem's file watcher and forwards Vite `change`, `add`, and `unlink` events to `hooks.notifyFileChange`. Testem still decides which of those paths rerun tests. Set nothing extra in your Testem config. `disable_watching: true` leaves `hooks.watching` false, so Vite keeps watching for module invalidation and Testem does not rerun. A single run (`hooks.singleRun`, including CI) closes Vite's watcher immediately. Older Testem does not pass these hooks, so both watchers stay as they are today.
+
+Testem builds that only pass the Express app, or the app and the HTTP server, do not provide `hooks.onExit`. Keep calling `close()` from **`on_exit`** so the Vite watcher does not stay open after Testem exits:
 
 ```javascript
 const { createTestemViteMiddleware } = require('vite-plugin-testem');
