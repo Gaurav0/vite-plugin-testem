@@ -127,12 +127,18 @@ async function assertMiddlewareRouting() {
   assert.strictEqual(typeof close, 'function');
 
   let handler;
+  const exits = [];
   middleware({
     use(fn) {
       handler = fn;
     },
+  }, null, {
+    onExit(fn) {
+      exits.push(fn);
+    },
   });
   assert.strictEqual(typeof handler, 'function');
+  assert.strictEqual(exits.length, 1);
 
   try {
     for (const url of ['/123/index.html', '/-7/index.html']) {
@@ -151,6 +157,7 @@ async function assertMiddlewareRouting() {
       assert.strictEqual(result.body, '', url);
     }
   } finally {
+    await exits[0]();
     await close();
     await fs.rm(tmp, { recursive: true, force: true });
   }

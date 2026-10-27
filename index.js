@@ -54,7 +54,7 @@ Testem.handleConsoleMessage = function (msg) {
  * Skips `/testem.js`, `/testem/*`, and `/socket.io` so Testem’s own routes run later in the stack.
  *
  * @param {import('vite').InlineConfig} [inlineConfig] merged after defaults; set `configFile: false` to skip loading `vite.config.js`
- * @returns {Promise<{ middleware: (app: import('express').Application) => void, close: () => Promise<void> }>}
+ * @returns {Promise<{ middleware: (app: import('express').Application, httpServer?: import('node:http').Server, hooks?: { onExit?: (fn: () => void | Promise<void>) => void }) => void, close: () => Promise<void> }>}
  */
 async function createTestemViteMiddleware(inlineConfig = {}) {
   const cwd = inlineConfig.root || inlineConfig.cwd || process.cwd();
@@ -78,7 +78,11 @@ async function createTestemViteMiddleware(inlineConfig = {}) {
 
   const server = await vite.createServer(base);
 
-  function middleware(app) {
+  function middleware(app, _httpServer, hooks) {
+    if (hooks && typeof hooks.onExit === 'function') {
+      hooks.onExit(() => server.close());
+    }
+
     app.use((req, res, next) => {
       let url = req.url;
       const qIdx = url.indexOf('?');
