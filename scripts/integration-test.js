@@ -28,8 +28,38 @@ function run(args, extraEnv) {
   }
 }
 
-run(['install', '--no-package-lock']);
-run(['install', '--no-save', '--no-package-lock', `testem@${version}`]);
+// Node 20.19 ships npm 10.8.2. Installing this fixture (Vite's optional
+// platform packages, via file:../..) crashes that npm on Linux:
+// "Cannot read properties of null (reading 'edgesOut')". npm 10.9 fixed it.
+// https://github.com/npm/cli/issues/4828
+function npmOlderThan109() {
+  const result = spawnSync('npm', ['--version'], { encoding: 'utf8' });
+  const parts = (result.stdout || '').trim().split('.').map((part) => parseInt(part, 10));
+  const major = parts[0];
+  const minor = parts[1];
+  return !Number.isFinite(major) || major < 10 || (major === 10 && minor < 9);
+}
+
+function runInstall(args) {
+  if (!npmOlderThan109()) {
+    return run(args);
+  }
+  const result = spawnSync('npx', ['--yes', 'npm@10.9.2', ...args], {
+    cwd: fixture,
+    stdio: 'inherit',
+    env: process.env,
+  });
+  if (result.error) {
+    console.error(result.error);
+    process.exit(1);
+  }
+  if (result.status !== 0) {
+    process.exit(result.status || 1);
+  }
+}
+
+runInstall(['install', '--no-package-lock']);
+runInstall(['install', '--no-save', '--no-package-lock', `testem@${version}`]);
 
 // Run outside the fixture so Testem does not load testem.js. That config
 // starts Vite, and `testem launchers` never calls on_exit to close it.
