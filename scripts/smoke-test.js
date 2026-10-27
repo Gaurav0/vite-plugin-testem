@@ -112,6 +112,63 @@ function dispatch(handler, url) {
   });
 }
 
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitUntil(predicate, timeout, message) {
+  const deadline = Date.now() + timeout;
+  while (!predicate()) {
+    if (Date.now() >= deadline) {
+      assert.fail(message);
+    }
+    await delay(50);
+  }
+}
+
+function captureServerPlugin() {
+  const captured = {
+    server: null,
+    plugin: {
+      name: 'capture-server',
+      configureServer(server) {
+        captured.server = server;
+      },
+    },
+  };
+  return captured;
+}
+
+function countPaths(paths, suffix) {
+  return paths.filter((file) => file.endsWith(suffix)).length;
+}
+
+async function whenWatcherSees(watcher, root) {
+  const wanted = path.resolve(root);
+  await waitUntil(
+    () => Object.keys(watcher.getWatched()).some((dir) => path.resolve(dir) === wanted),
+    4000,
+    `Vite watcher did not see ${root}`,
+  );
+}
+
+async function openMiddleware(root, plugins = []) {
+  const captured = captureServerPlugin();
+  const handle = await createTestemViteMiddleware({
+    root,
+    configFile: false,
+    // HTML requests otherwise start a dep scan that can outlive server.close().
+    optimizeDeps: { noDiscovery: true },
+    plugins: [captured.plugin, ...plugins],
+  });
+  assert.ok(captured.server, 'configureServer should capture the Vite server');
+  return {
+    middleware: handle.middleware,
+    close: handle.close,
+    watcher: captured.server.watcher,
+  };
+}
+
 async function assertMiddlewareRouting() {
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'vite-plugin-testem-'));
   await fs.writeFile(
@@ -119,11 +176,7 @@ async function assertMiddlewareRouting() {
     `<html><head></head><body>${PAGE_MARKER}</body></html>`,
   );
 
-  const { middleware, close } = await createTestemViteMiddleware({
-    root: tmp,
-    configFile: false,
-    plugins: [vitePluginTestem()],
-  });
+  const { middleware, close, watcher } = await openMiddleware(tmp, [vitePluginTestem()]);
   assert.strictEqual(typeof close, 'function');
 
   let handler;
@@ -156,72 +209,180 @@ async function assertMiddlewareRouting() {
       assert.strictEqual(result.nextCalled, true, url);
       assert.strictEqual(result.body, '', url);
     }
-  } finally {
+
+    assert.strictEqual(watcher.closed, false);
     await exits[0]();
+    assert.strictEqual(watcher.closed, true, 'onExit should close the Vite server');
+  } finally {
     await close();
     await fs.rm(tmp, { recursive: true, force: true });
   }
 }
 
+async function waitForAnother(paths, suffix, previous, label) {
+  await waitUntil(
+    () => countPaths(paths, suffix) > previous,
+    4000,
+    `${label}, got ${paths.join(', ')}`,
+  );
+  return countPaths(paths, suffix);
+}
+
 async function assertWatcherHandoff() {
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'vite-plugin-testem-watch-'));
   const file = path.join(tmp, 'keep.js');
+  const added = path.join(tmp, 'added.js');
   await fs.writeFile(file, '1\n');
 
-  const dev = await createTestemViteMiddleware({
-    root: tmp,
-    configFile: false,
-  });
+  let dev;
+  let ci;
+  try {
+    dev = await openMiddleware(tmp);
+    const changes = [];
+    let released = false;
+    dev.middleware({ use() {} }, null, {
+      onExit() {},
+      watching: true,
+      singleRun: false,
+      notifyFileChange(changed) {
+        changes.push(changed);
+      },
+      releaseFileWatcher() {
+        released = true;
+      },
+    });
+    assert.strictEqual(released, true);
+    await whenWatcherSees(dev.watcher, tmp);
+    assert.strictEqual(dev.watcher.closed, false);
+
+    const keepBefore = countPaths(changes, 'keep.js');
+    await fs.writeFile(file, '2\n');
+    await waitForAnother(changes, 'keep.js', keepBefore, 'expected a change event for keep.js');
+
+    const addedBefore = countPaths(changes, 'added.js');
+    await fs.writeFile(added, 'export {}\n');
+    const addedAfterCreate = await waitForAnother(
+      changes,
+      'added.js',
+      addedBefore,
+      'expected an add event for added.js',
+    );
+    await fs.rm(added);
+    await waitForAnother(
+      changes,
+      'added.js',
+      addedAfterCreate,
+      'expected an unlink event for added.js',
+    );
+    await dev.close();
+
+    ci = await openMiddleware(tmp);
+    const ciChanges = [];
+    let ciReleased = false;
+    ci.middleware({ use() {} }, null, {
+      onExit() {},
+      watching: true,
+      singleRun: true,
+      notifyFileChange(changed) {
+        ciChanges.push(changed);
+      },
+      releaseFileWatcher() {
+        ciReleased = true;
+      },
+    });
+    assert.strictEqual(ciReleased, false);
+    await waitUntil(
+      () => ci.watcher.closed,
+      4000,
+      'single run should close the Vite watcher',
+    );
+    await fs.writeFile(file, '3\n');
+    await delay(200);
+    assert.deepStrictEqual(ciChanges, []);
+  } finally {
+    if (dev) {
+      await dev.close();
+    }
+    if (ci) {
+      await ci.close();
+    }
+    await fs.rm(tmp, { recursive: true, force: true });
+  }
+}
+
+async function assertWatchingDisabled() {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'vite-plugin-testem-nowatch-'));
+  const file = path.join(tmp, 'keep.js');
+  await fs.writeFile(file, '1\n');
+
+  const paused = await openMiddleware(tmp);
   const changes = [];
   let released = false;
-  dev.middleware({ use() {} }, null, {
-    onExit() {},
-    watching: true,
-    singleRun: false,
-    notifyFileChange(changed) {
-      changes.push(changed);
-    },
-    releaseFileWatcher() {
-      released = true;
-    },
-  });
-  assert.strictEqual(released, true);
-  await new Promise((resolve) => setTimeout(resolve, 600));
-  await fs.writeFile(file, '2\n');
-  const deadline = Date.now() + 4000;
-  while (!changes.some((changed) => changed.endsWith('keep.js')) && Date.now() < deadline) {
-    await new Promise((resolve) => setTimeout(resolve, 50));
+  let sawChange = false;
+  try {
+    paused.middleware({ use() {} }, null, {
+      onExit() {},
+      watching: false,
+      singleRun: false,
+      notifyFileChange(changed) {
+        changes.push(changed);
+      },
+      releaseFileWatcher() {
+        released = true;
+      },
+    });
+    assert.strictEqual(released, false);
+    assert.strictEqual(paused.watcher.closed, false);
+    await whenWatcherSees(paused.watcher, tmp);
+    paused.watcher.on('change', (changed) => {
+      if (changed.endsWith('keep.js')) {
+        sawChange = true;
+      }
+    });
+    await fs.writeFile(file, '2\n');
+    await waitUntil(
+      () => sawChange,
+      4000,
+      'disable_watching should leave the Vite watcher open',
+    );
+    await delay(200);
+    assert.deepStrictEqual(changes, []);
+    assert.strictEqual(paused.watcher.closed, false);
+  } finally {
+    await paused.close();
+    await fs.rm(tmp, { recursive: true, force: true });
   }
-  assert.ok(
-    changes.some((changed) => changed.endsWith('keep.js')),
-    `expected a watcher event for keep.js, got ${changes.join(', ')}`,
-  );
-  await dev.close();
+}
 
-  const ci = await createTestemViteMiddleware({
-    root: tmp,
-    configFile: false,
-  });
-  const ciChanges = [];
-  let ciReleased = false;
-  ci.middleware({ use() {} }, null, {
-    onExit() {},
-    watching: true,
-    singleRun: true,
-    notifyFileChange(changed) {
-      ciChanges.push(changed);
-    },
-    releaseFileWatcher() {
-      ciReleased = true;
-    },
-  });
-  assert.strictEqual(ciReleased, false);
-  await new Promise((resolve) => setTimeout(resolve, 800));
-  await fs.writeFile(file, '3\n');
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  assert.deepStrictEqual(ciChanges, []);
-  await ci.close();
-  await fs.rm(tmp, { recursive: true, force: true });
+async function assertMiddlewareWithoutHooks() {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'vite-plugin-testem-nohooks-'));
+  const file = path.join(tmp, 'keep.js');
+  await fs.writeFile(file, '1\n');
+
+  const bare = await openMiddleware(tmp);
+  let sawChange = false;
+  try {
+    bare.middleware({ use() {} });
+    bare.middleware({ use() {} }, null);
+    assert.strictEqual(bare.watcher.closed, false);
+    await whenWatcherSees(bare.watcher, tmp);
+    bare.watcher.on('change', (changed) => {
+      if (changed.endsWith('keep.js')) {
+        sawChange = true;
+      }
+    });
+    await fs.writeFile(file, '2\n');
+    await waitUntil(
+      () => sawChange,
+      4000,
+      'middleware without hooks should leave the Vite watcher open',
+    );
+    await bare.close();
+    assert.strictEqual(bare.watcher.closed, true);
+  } finally {
+    await bare.close();
+    await fs.rm(tmp, { recursive: true, force: true });
+  }
 }
 
 async function main() {
@@ -235,6 +396,8 @@ async function main() {
   assertHtmlInjection();
   await assertMiddlewareRouting();
   await assertWatcherHandoff();
+  await assertWatchingDisabled();
+  await assertMiddlewareWithoutHooks();
 }
 
 main().catch((err) => {
