@@ -34,7 +34,7 @@ jobs:
           # Cells without vite-version use the fixture's Vite 8.
           - node-version: '20.19'
             testem-version: '3.20.0'
-          # Vite 7 on the oldest supported Node and Testem.
+          # Vite 7 on the oldest supported Node and Testem. Also runs the smoke test.
           - node-version: '20.19'
             testem-version: '3.20.0'
             vite-version: '7'

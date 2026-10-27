@@ -137,6 +137,14 @@ const resolvedVite = viteVersion
   ? assertPluginVite(viteVersion)
   : installedViteVersion(repoRoot);
 
+// The browser run leaves Vite's watcher in place (disable_watching) and never
+// receives hooks.onExit. The smoke test covers those paths, and the test job
+// only runs it against Vite 8.
+if (viteVersion) {
+  console.log(`smoke test against vite@${resolvedVite}`);
+  run(['test'], undefined, repoRoot);
+}
+
 // Run outside the fixture so Testem does not load testem.js. That config
 // starts Vite, and `testem launchers` never calls on_exit to close it.
 const launchersDir = fs.mkdtempSync(
