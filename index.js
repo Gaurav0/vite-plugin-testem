@@ -82,6 +82,7 @@ async function createTestemViteMiddleware(inlineConfig = {}) {
     if (hooks && typeof hooks.onExit === 'function') {
       hooks.onExit(() => server.close());
     }
+    adoptFileWatcher(server, hooks);
 
     app.use((req, res, next) => {
       let url = req.url;
@@ -139,6 +140,42 @@ async function createTestemViteMiddleware(inlineConfig = {}) {
     middleware,
     close: () => server.close(),
   };
+}
+
+/**
+ * CI and other single runs do not need Vite's chokidar. In dev, when Testem is
+ * watching, drop Testem's watcher and forward Vite's events so only one
+ * chokidar is open. `watching: false` (disable_watching) leaves Vite's watcher
+ * in place for module invalidation and does not rerun tests.
+ *
+ * @param {import('vite').ViteDevServer} server
+ * @param {{ singleRun?: boolean, watching?: boolean, notifyFileChange?: (file: string) => void, releaseFileWatcher?: () => void | Promise<void> } | undefined} hooks
+ */
+function adoptFileWatcher(server, hooks) {
+  if (!hooks) {
+    return;
+  }
+  if (hooks.singleRun) {
+    const closed = server.watcher && server.watcher.close();
+    if (closed && typeof closed.catch === 'function') {
+      closed.catch((err) => {
+        server.config.logger.error(err);
+      });
+    }
+    return;
+  }
+  if (!hooks.watching || typeof hooks.notifyFileChange !== 'function') {
+    return;
+  }
+  if (typeof hooks.releaseFileWatcher === 'function') {
+    Promise.resolve(hooks.releaseFileWatcher()).catch((err) => {
+      server.config.logger.error(err);
+    });
+  }
+  const notify = (file) => hooks.notifyFileChange(file);
+  server.watcher.on('change', notify);
+  server.watcher.on('add', notify);
+  server.watcher.on('unlink', notify);
 }
 
 module.exports = {

@@ -163,6 +163,67 @@ async function assertMiddlewareRouting() {
   }
 }
 
+async function assertWatcherHandoff() {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'vite-plugin-testem-watch-'));
+  const file = path.join(tmp, 'keep.js');
+  await fs.writeFile(file, '1\n');
+
+  const dev = await createTestemViteMiddleware({
+    root: tmp,
+    configFile: false,
+  });
+  const changes = [];
+  let released = false;
+  dev.middleware({ use() {} }, null, {
+    onExit() {},
+    watching: true,
+    singleRun: false,
+    notifyFileChange(changed) {
+      changes.push(changed);
+    },
+    releaseFileWatcher() {
+      released = true;
+    },
+  });
+  assert.strictEqual(released, true);
+  await new Promise((resolve) => setTimeout(resolve, 600));
+  await fs.writeFile(file, '2\n');
+  const deadline = Date.now() + 4000;
+  while (!changes.some((changed) => changed.endsWith('keep.js')) && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  assert.ok(
+    changes.some((changed) => changed.endsWith('keep.js')),
+    `expected a watcher event for keep.js, got ${changes.join(', ')}`,
+  );
+  await dev.close();
+
+  const ci = await createTestemViteMiddleware({
+    root: tmp,
+    configFile: false,
+  });
+  const ciChanges = [];
+  let ciReleased = false;
+  ci.middleware({ use() {} }, null, {
+    onExit() {},
+    watching: true,
+    singleRun: true,
+    notifyFileChange(changed) {
+      ciChanges.push(changed);
+    },
+    releaseFileWatcher() {
+      ciReleased = true;
+    },
+  });
+  assert.strictEqual(ciReleased, false);
+  await new Promise((resolve) => setTimeout(resolve, 800));
+  await fs.writeFile(file, '3\n');
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  assert.deepStrictEqual(ciChanges, []);
+  await ci.close();
+  await fs.rm(tmp, { recursive: true, force: true });
+}
+
 async function main() {
   assert.strictEqual(typeof vitePluginTestem, 'function');
   assert.strictEqual(typeof createTestemViteMiddleware, 'function');
@@ -173,6 +234,7 @@ async function main() {
 
   assertHtmlInjection();
   await assertMiddlewareRouting();
+  await assertWatcherHandoff();
 }
 
 main().catch((err) => {
